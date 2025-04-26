@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <!-- Connection Button -->
+        <Button
+            android:id="@+id/connectButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Connect to BluetoothDevice"/>
+
+        <!-- Send User Data Section -->
+        <EditText
+            android:id="@+id/phoneInput"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="Phone Number"
+            android:inputType="phone" />
+
+        <EditText
+            android:id="@+id/wifiIdInput"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="WiFi ID"
+            android:inputType="text" />
+
+        <EditText
+            android:id="@+id/wifiPassInput"
+            android:layout_width="match_parent"
+            android:layout_height="50dp"
+            android:hint="WiFi Password"
+            android:inputType="textPassword" />
+
+        <Button
+            android:id="@+id/sendDataButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Send Data"/>
+
+        <!-- Received Data Section -->
+        <TextView
+            android:id="@+id/receivedText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Received Messages:"
+            android:textStyle="bold"
+            android:paddingTop="16dp"
+            android:textSize="18sp"/>
+        <TextView
+            android:id="@+id/bpmTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="BPM: --" />
+
+        <TextView
+            android:id="@+id/spo2TextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SpO2: --" />
+
+        <TextView
+            android:id="@+id/decisionTextView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Decision: --" />
+
+    </LinearLayout>
+</ScrollView>
