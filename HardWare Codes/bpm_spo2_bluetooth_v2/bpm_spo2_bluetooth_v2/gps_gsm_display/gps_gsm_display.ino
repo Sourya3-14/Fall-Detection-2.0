@@ -6,6 +6,10 @@
 #define OLED_SDA 4
 #define OLED_SCL 5
 
+#define BAT1_PIN 34  // ADC1 pin for Battery 1 (ESP32 side)
+#define BAT2_PIN 35  // ADC1 pin for Battery 2 (GSM side)
+int percent = 0;
+
 SoftWire myWire(OLED_SDA, OLED_SCL); // SDA, SCL
 // U8g2 object for SH1106 128x64 using Software I2C
 U8G2_SH1106_128X64_NONAME_F_SW_I2C display(U8G2_R0, OLED_SCL, OLED_SDA, U8X8_PIN_NONE);
@@ -41,7 +45,7 @@ void receiveEvent(int bytes) {
 }
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(115200);
   Serial.println("Serial Monitor Started...");
 
   while (!Wire.begin(8)); // Slave address = 0x08
@@ -49,15 +53,15 @@ void setup() {
   allowReceive = false;
 
   Serial.println("I2C bus started");
-  delay(500);
+  delay(100);
 
   GPS.begin(9600, SERIAL_8N1, 16, 17);  // RX, TX for GPS
   Serial.println("GPSSerial Monitor Started...");
-  delay(500);
+  delay(100);
 
   GSM.begin(9600, SERIAL_8N1, 26, 25);  // RX, TX for GSM
   Serial.println("GSMSerial Monitor Started...");
-  delay(500);
+  delay(100);
 
   Serial.println("Initializing SIM800L...");
   sendCommand("AT");
@@ -71,26 +75,26 @@ void setup() {
 
   display.begin(); // Start U8g2
   display.clearBuffer();
-  // display.setFont(u8g2_font_ncenB08_tr);
   display.setFont(u8g2_font_5x7_tr);
-  display.drawStr(0, 10, "Display Started...");
-  display.sendBuffer();
 
   Serial.println("Display Started...");
   text_display("Booting up the device");
 
   pinMode(2, OUTPUT);
+  digitalWrite(2, LOW);
+  delay(10);//debounce delay
   digitalWrite(2, HIGH);
-  delay(1000);
+  delay(500);
   digitalWrite(2, LOW);
   allowReceive = true;
 }
 
 void loop() {
-  Location = getLocation();
+  getBattery();
+  // Location = getLocation();
   if (!digitalRead(12)) {
     allowReceive = false;
-    // Location = getLocation();
+    Location = getLocation();
     text_display("Called for help on  " + content[3]);
     String temp = "Urgent need for help\n\nLocation: https://maps.google.com/maps?q=" + Location;
     SOS(content[3], temp);
@@ -101,30 +105,34 @@ void loop() {
   Serial.println("SpO2: " + content[1]);
   Serial.println("Decision: " + content[2]);
   Serial.println("Phone Number: " + content[3]);
-
-  if (content[2] == "2") {
-    allowReceive = false;
-    // Location = getLocation();
-    digitalWrite(14, HIGH);
-    OLED_display(content[0], content[1], "Fall detected calling on " + content[3]);
+  if(content[0]=="0" && content[1]=="0"){
+    text_display("Please insert finger at the Oximeter");
+  }
+  else if (content[2] == "2") {
+    // allowReceive = false;
+    Location = getLocation();
+    digitalWrite(2, HIGH);
+    OLED_display(content[0], content[1], "Fall detected alert sent on" + content[3]);
     String temp = "Patient Fell Down\n\nLocation: https://maps.google.com/maps?q=" + Location;
     SOS(content[3], temp);
-    digitalWrite(14, LOW);
-    allowReceive = true;
-
-  } else {
+    digitalWrite(2, LOW);
+    // allowReceive = true;
+  } 
+  else if(content[2] == "1") {
     OLED_display(content[0], content[1], arr[content[2].toInt()]);
-    if (content[2] == "1") {
-      allowReceive = false;
-      unsigned long startBlink = millis();
-      while (millis() - startBlink < 3000) {
-        digitalWrite(14, HIGH);
-        delay(500);
-        digitalWrite(14, LOW);
-        delay(500);
-      }
-      allowReceive = true;
+    // allowReceive = false;
+    unsigned long startBlink = millis();
+    while (millis() - startBlink < 3000) {
+      digitalWrite(2, HIGH);
+      delay(500);
+      digitalWrite(2, LOW);
+      delay(500);
     }
+    // allowReceive = true;
+    delay(100);
+  }
+  else{
+    OLED_display(content[0], content[1], arr[content[2].toInt()]);
   }
 }
 
@@ -159,38 +167,26 @@ void sendSMS(const char* number, const char* message) {
 
   Serial.println("SMS Sent!");
 }
-
-// void readMessage() {
-//   int prevIndex = 0;
-//   for (int i = 0; i < 4; i++) {
-//     int delimIndex = readString.indexOf(',', prevIndex);
-//     if (delimIndex == -1) delimIndex = readString.length();
-//     content[i] = readString.substring(prevIndex, delimIndex);
-//     prevIndex = delimIndex + 1;
-//   }
-// }
-
 void OLED_display(String bpm, String spo2, String state) {
   display.clearBuffer();
-  // display.setFont(u8g2_font_ncenB08_tr);
-
   display.setFont(u8g2_font_5x7_tr);
-
-  // display.setCursor(5, 10);
   display.drawStr(5,10, "Patient Status:");
-
-  // display.setCursor(5, 25);
   display.drawStr(5,20, "BPM: ");
   display.drawStr(30, 20, bpm.c_str());   // Shift to the right for the value
-
-  // display.setCursor(5, 40);
   display.drawStr(5, 30, "SpO2: ");
   display.drawStr(30, 30, spo2.c_str());  // Shift to the right for the value
   display.drawStr(50, 30, "%");           // % sign next to spo2
 
-  // display.setCursor(5, 40);
-  display.drawStr(5, 40, state.c_str());  // Patient state
+  int y = 40;  // Starting y position (a bit down)
+  int lineHeight = 10;  // Height of each line (adjust if needed)
 
+  while (state.length() > 0) {
+    String line = state.substring(0, min(20, int(state.length()))); // Take first 20 characters
+    display.drawStr(5, y, line.c_str());  // Draw the line
+    state = state.substring(min(20, int(state.length())));  // Remove the part we just drew
+    y += lineHeight;  // Move to next line
+  }
+  displayBattery();
   display.sendBuffer();
 }
 void text_display(String text) {
@@ -206,7 +202,7 @@ void text_display(String text) {
     text = text.substring(min(20, int(text.length())));  // Remove the part we just drew
     y += lineHeight;  // Move to next line
   }
-
+  displayBattery();
   display.sendBuffer();
 }
 
@@ -222,4 +218,33 @@ String getLocation() {
     }
   }
   return Loc;
+}
+void displayBattery(){
+  display.setFont(u8g2_font_5x7_tr);
+  display.drawStr(80,60,"Bat: ");
+  display.drawStr(110,60,String(percent).c_str());
+  display.drawStr(120,60,"%");
+}
+void getBattery(){
+  int raw1 = analogRead(BAT1_PIN);
+  int raw2 = analogRead(BAT2_PIN);
+
+  // Convert ADC value to voltage (using 3.3V reference and 10k-10k divider)
+  float voltage1 = raw1 * (3.3 / 4095.0) * 2;
+  float voltage2 = raw2 * (3.3 / 4095.0) * 2;
+
+  // Get battery percentage
+  int percent1 = getBatteryPercent(voltage1);
+  int percent2 = getBatteryPercent(voltage2);
+  if(percent != 0){
+    int smoothed = percent;
+    percent = min(percent1,percent2);
+    percent = 0.1 * percent + (1 - 0.1) * smoothed; // smoothing factor 0.1
+  }
+  else{
+    percent = min(percent1,percent2);
+  }
+}
+int getBatteryPercent(float voltage) {
+  return voltage/3.7 *100;
 }
