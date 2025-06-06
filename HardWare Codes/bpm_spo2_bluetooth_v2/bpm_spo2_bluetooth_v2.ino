@@ -55,7 +55,7 @@ void setup() {
   // }
 
   // Try to initialize!
-   byte status = mpu.begin();
+  byte status = mpu.begin();
   Serial.print(F("MPU6050 status: "));
   Serial.println(status);
   while(status!=0){ } // stop everything if could not connect to MPU6050
@@ -133,11 +133,11 @@ void loop() {
     tsLastReport = millis();
   }
 
-    String msg = String(int(bpm)) + "," + String(int(spo2)) + "," + String(pred) + "," + phoneNumber;
-    Wire1.beginTransmission(8);
-    Wire1.write((const uint8_t*)msg.c_str(), strlen(msg.c_str()));
-    Wire1.endTransmission();  
-    Serial.println("Sent to Slave:" + msg );
+  String msg = String(int(bpm)) + "," + String(int(spo2)) + "," + String(pred) + "," + phoneNumber + "," + "1";
+  Wire1.beginTransmission(8);
+  Wire1.write((const uint8_t*)msg.c_str(), strlen(msg.c_str()));
+  Wire1.endTransmission();  
+  Serial.println("Sent to Slave:" + msg );
 
   if (millis() - lastSendTime > 100) {
     sendSensorData(int(bpm),int(spo2),pred);
