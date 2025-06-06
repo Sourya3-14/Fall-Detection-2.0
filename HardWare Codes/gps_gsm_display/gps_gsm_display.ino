@@ -19,11 +19,10 @@ TinyGPSPlus gps;
 HardwareSerial GPS(1);
 HardwareSerial GSM(2);
 
-String content[4] = {"72", "96", "0", "+910123456789"};
+String content[5] = {"72", "96", "0", "+910123456789","0"};
 String arr[3] = {"Safe", "Fall Prob Detected", "Fall Detected"};
 String Location = "0.0,0.0";
 String readString = "";
-
 volatile bool allowReceive = false;  // Global flag to allow data reception
 
 void receiveEvent(int bytes) {
@@ -36,7 +35,7 @@ void receiveEvent(int bytes) {
     readString = readString + String(c);
   }
   int prevIndex = 0;
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 5; i++) {
     int delimIndex = readString.indexOf(',', prevIndex);
     if (delimIndex == -1) delimIndex = readString.length();
     content[i] = readString.substring(prevIndex, delimIndex);
@@ -91,48 +90,63 @@ void setup() {
 
 void loop() {
   getBattery();
-  // Location = getLocation();
-  if (!digitalRead(12)) {
-    allowReceive = false;
-    Location = getLocation();
-    text_display("Called for help on  " + content[3]);
-    String temp = "Urgent need for help\n\nLocation: https://maps.google.com/maps?q=" + Location;
-    SOS(content[3], temp);
-    delay(1000);
-    allowReceive = true;
-  }
-  Serial.println("BPM: " + content[0]);
-  Serial.println("SpO2: " + content[1]);
-  Serial.println("Decision: " + content[2]);
-  Serial.println("Phone Number: " + content[3]);
-  if(content[0]=="0" && content[1]=="0"){
-    text_display("Please insert finger at the Oximeter");
-  }
-  else if (content[2] == "2") {
-    // allowReceive = false;
-    Location = getLocation();
-    digitalWrite(2, HIGH);
-    OLED_display(content[0], content[1], "Fall detected alert sent on" + content[3]);
-    String temp = "Patient Fell Down\n\nLocation: https://maps.google.com/maps?q=" + Location;
-    SOS(content[3], temp);
-    digitalWrite(2, LOW);
-    // allowReceive = true;
-  } 
-  else if(content[2] == "1") {
-    OLED_display(content[0], content[1], arr[content[2].toInt()]);
-    // allowReceive = false;
-    unsigned long startBlink = millis();
-    while (millis() - startBlink < 3000) {
-      digitalWrite(2, HIGH);
-      delay(500);
-      digitalWrite(2, LOW);
-      delay(500);
+  if(content[5]=="1" && percent > 0){
+    // Location = getLocation();
+    if (!digitalRead(12)) {
+      allowReceive = false;
+      Location = getLocation();
+      text_display("Called for help on  " + content[3]);
+      String temp = "Urgent need for help\n\nLocation: https://maps.google.com/maps?q=" + Location;
+      SOS(content[3], temp);
+      delay(1000);
+      allowReceive = true;
     }
-    // allowReceive = true;
-    delay(100);
+    Serial.println("BPM: " + content[0]);
+    Serial.println("SpO2: " + content[1]);
+    Serial.println("Decision: " + content[2]);
+    Serial.println("Phone Number: " + content[3]);
+    if(content[0]=="0" && content[1]=="0"){
+      text_display("Please insert finger at the Oximeter");
+    }
+    else if (content[2] == "2") {
+      allowReceive = false;
+      Location = getLocation();
+      digitalWrite(2, HIGH);
+      OLED_display(content[0], content[1], "Fall detected alert sent on" + content[3]);
+      String temp = "Patient Fell Down\n\nLocation: https://maps.google.com/maps?q=" + Location;
+      SOS(content[3], temp);
+      digitalWrite(2, LOW);
+      content[2] == "0";
+      allowReceive = true;
+      delay(200);
+    } 
+    else if(content[2] == "1") {
+      OLED_display(content[0], content[1], arr[content[2].toInt()]);
+      allowReceive = false;
+      unsigned long startBlink = millis();
+      while (millis() - startBlink < 3000) {
+        digitalWrite(2, HIGH);
+        delay(500);
+        digitalWrite(2, LOW);
+        delay(500);
+      }
+      content[2] == "0";
+      allowReceive = true;
+      delay(200);
+    }
+    else{
+      OLED_display(content[0], content[1], arr[content[2].toInt()]);
+    }
+  }
+  else if(percent>0){
+    text_display("Device started waiting for the data(Use the app)");
   }
   else{
-    OLED_display(content[0], content[1], arr[content[2].toInt()]);
+    text_display("battery too low put the device on charging");
+    display.clearBuffer();
+    delay(100);
+    while(precent<=0)
+      getBattery();
   }
 }
 
@@ -179,11 +193,10 @@ void OLED_display(String bpm, String spo2, String state) {
 
   int y = 40;  // Starting y position (a bit down)
   int lineHeight = 10;  // Height of each line (adjust if needed)
-
   while (state.length() > 0) {
     String line = state.substring(0, min(20, int(state.length()))); // Take first 20 characters
     display.drawStr(5, y, line.c_str());  // Draw the line
-    state = state.substring(min(20, int(state.length())));  // Remove the part we just drew
+    state = (state.substring(min(20, int(state.length())))).trim();  // Remove the part we just drew
     y += lineHeight;  // Move to next line
   }
   displayBattery();
@@ -246,5 +259,11 @@ void getBattery(){
   }
 }
 int getBatteryPercent(float voltage) {
-  return voltage/3.7 *100;
+  const float minVoltage = 2.5; // 0%
+  const float maxVoltage = 3.6; // 100%
+
+  if (voltage <= minVoltage) return 0;
+  if (voltage >= maxVoltage) return 100;
+
+  return (int)(((voltage - minVoltage) / (maxVoltage - minVoltage)) * 100);
 }
