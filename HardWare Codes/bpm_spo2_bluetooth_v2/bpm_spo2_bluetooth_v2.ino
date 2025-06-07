@@ -1,9 +1,9 @@
+#include <Wire.h>
+#include "MAX30100.h"
 #include "MAX30100_PulseOximeter.h"
 #include <MPU6050_light.h>
 #include "BluetoothSerial.h"
 #include <Preferences.h>
-#include <Wire.h>
-
 
 BluetoothSerial SerialBT;
 Preferences prefs;
@@ -23,6 +23,7 @@ float roll1;
 
 
 #define REPORTING_PERIOD_MS 1000
+MAX30100 sensor;
 PulseOximeter pox;
 uint32_t tsLastReport = 0;
 float hrv = 0.0;
@@ -32,12 +33,15 @@ float bpm=0.0,spo2=0.0;
 float lower[3]={56,91,21};
 float upper[3]={178,100,120};
 int intervalindex = 0;
+String valid = "0";
 void onBeatDetected() {}
 
 int pred = 0;
 int count = 0;
 HardwareSerial mySerial(2);
 unsigned long lastSendTime = 0;
+
+String sig = "0";
 
 void setup() {
   Serial.begin(115200);
@@ -48,11 +52,6 @@ void setup() {
   Serial.println("ESP32 Bluetooth started. Waiting for data...");
 
   recieveBluetoothDataFirstTime();
-
-  // if (!pox.begin()) {
-  //   Serial.println("Failed to find MAX30100 chip");
-  //   while (1);
-  // }
 
   // Try to initialize!
   byte status = mpu.begin();
@@ -70,6 +69,19 @@ void setup() {
   digitalWrite(12, HIGH);
   delay(500);
   digitalWrite(12, LOW);
+
+  if (!sensor.begin()) {
+    Serial.print("FAILED: ");
+    while (1);
+  } else {
+    Serial.println("Success");
+  }
+  sensor.setMode(MAX30100_MODE_SPO2_HR);
+  sensor.setLedsCurrent(MAX30100_LED_CURR_50MA, MAX30100_LED_CURR_50MA);
+  sensor.setLedsCurrent(MAX30100_LED_CURR_7_6MA, MAX30100_LED_CURR_7_6MA);
+  sensor.shutdown();
+  sensor.resume();
+  sensor.resetFifo();
 
   if (!pox.begin()) {
     Serial.println("Failed to find MAX30100 chip");
@@ -110,20 +122,20 @@ void loop() {
       incomingData += incomingChar;
     }
   }
-  float tempSpo2=0;
-  float tempBpm=0;
+  uint16_t ir, red;
   pox.update();
+  sensor.update();
   if (millis() - tsLastReport > REPORTING_PERIOD_MS) {
-    tempSpo2 = pox.getSpO2();
-    tempBpm = pox.getHeartRate();
-    if(tempSpo2 == 0 && tempBpm ==0){
-      spo2 = tempSpo2;
-      bpm = tempBpm;
+    sensor.getRawValues(&ir, &red);
+    valid = (ir > 10000 && red > 10000)?"1":"0";
+
+    spo2 = pox.getSpO2();
+    bpm = pox.getHeartRate();
+    if(spo2!=0 && bpm !=0){
+      spo2 = constrain(spo2,lower[1],upper[1]);
+      bpm = constrain(bpm,lower[0],upper[0]);
     }
-    else{
-      spo2 = constrain(tempSpo2,lower[1],upper[1]);
-      bpm = constrain(tempBpm,lower[0],upper[0]);
-    }
+    
     intervals[intervalindex] = (bpm == 0) ? 0 : 60000 / bpm;
     intervalindex = int((intervalindex + 1) % 5);
 
@@ -132,8 +144,8 @@ void loop() {
     }
     tsLastReport = millis();
   }
-
-  String msg = String(int(bpm)) + "," + String(int(spo2)) + "," + String(pred) + "," + phoneNumber + "," + "1";
+  sig = "1";
+  String msg = String(int(bpm)) + "," + String(int(spo2)) + "," + String(pred) + "," + phoneNumber + "," +  valid + "," + sig;
   Wire1.beginTransmission(8);
   Wire1.write((const uint8_t*)msg.c_str(), strlen(msg.c_str()));
   Wire1.endTransmission();  

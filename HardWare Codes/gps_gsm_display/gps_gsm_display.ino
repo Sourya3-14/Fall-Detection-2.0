@@ -19,7 +19,7 @@ TinyGPSPlus gps;
 HardwareSerial GPS(1);
 HardwareSerial GSM(2);
 
-String content[5] = {"72", "96", "0", "+910123456789","0"};
+String content[6] = {"72", "96", "0", "+910123456789","0","0"};
 String arr[3] = {"Safe", "Fall Prob Detected", "Fall Detected"};
 String Location = "0.0,0.0";
 String readString = "";
@@ -35,7 +35,7 @@ void receiveEvent(int bytes) {
     readString = readString + String(c);
   }
   int prevIndex = 0;
-  for (int i = 0; i < 5; i++) {
+  for (int i = 0; i < 6; i++) {
     int delimIndex = readString.indexOf(',', prevIndex);
     if (delimIndex == -1) delimIndex = readString.length();
     content[i] = readString.substring(prevIndex, delimIndex);
@@ -91,8 +91,7 @@ void setup() {
 void loop() {
   getBattery();
   if(content[5]=="1" && percent > 0){
-    // Location = getLocation();
-    if (!digitalRead(12)) {
+    if (!digitalRead(12)){
       allowReceive = false;
       Location = getLocation();
       text_display("Called for help on  " + content[3]);
@@ -105,7 +104,7 @@ void loop() {
     Serial.println("SpO2: " + content[1]);
     Serial.println("Decision: " + content[2]);
     Serial.println("Phone Number: " + content[3]);
-    if(content[0]=="0" && content[1]=="0"){
+    if(content[4]=="0"){
       text_display("Please insert finger at the Oximeter");
     }
     else if (content[2] == "2") {
@@ -145,7 +144,7 @@ void loop() {
     text_display("battery too low put the device on charging");
     display.clearBuffer();
     delay(100);
-    while(precent<=0)
+    while(percent<=0)
       getBattery();
   }
 }
@@ -196,7 +195,7 @@ void OLED_display(String bpm, String spo2, String state) {
   while (state.length() > 0) {
     String line = state.substring(0, min(20, int(state.length()))); // Take first 20 characters
     display.drawStr(5, y, line.c_str());  // Draw the line
-    state = (state.substring(min(20, int(state.length())))).trim();  // Remove the part we just drew
+    state = (state.substring(min(20, int(state.length()))));  // Remove the part we just drew
     y += lineHeight;  // Move to next line
   }
   displayBattery();
